@@ -68,7 +68,7 @@ def kvs_from_toc_file(file):
       if line and line.startswith('## '):
          (k, v) = RE_TOC_KV.match(line).groups()
          kvs[k] = v
-   
+
    return kvs
 
 # -
@@ -1320,7 +1320,7 @@ if MOCK_REQUESTS:
    # This was actually page=5, but pretend 3.
    MOCK_REQUESTS['https://api.github.com/repos/Tercioo/Details-Damage-Meter/tags?per_page=100&page=3'] = '''\
 []'''
-   
+
 
 # -
 
@@ -1354,13 +1354,13 @@ def request_json(url):
          if DUMP_REQUESTS:
             return fetch()
          raise
-         
+
       text = text.replace('\r\n', '\n')
       j = json.loads(text)
       return j
 
    return fetch()
-   
+
 
 # -
 
@@ -1399,8 +1399,8 @@ class Addon:
       self.fn_query_latest_asset = fn_query_latest_asset
       self.fn_install = fn_install
       self.fn_parse_version = parse_version__default
-      self.fn_filter_likely_assets = filter_likely_assets__default
-   
+      self.fn_asset_version_from_download_name = None
+
 
    def print(self, text, **kwargs):
       print2(f'[{self.name}] {text}', **kwargs)
@@ -1412,8 +1412,8 @@ class Addon:
          return None
       toc = addon_dir / f'{self.name}.toc'
       assert toc.exists(), toc
-      
-      
+
+
       self.print(f'Reading version from {toc}', v=1)
       kvs = kvs_from_toc_file(toc)
 
@@ -1432,18 +1432,32 @@ class Addon:
          raise
 
 
-   def github_latest_release(self, repo, asset_filter=None):
+   def query_latest_asset(self):
+      asset = self.fn_query_latest_asset(self)
+      if self.fn_asset_version_from_download_name:
+         version = self.fn_asset_version_from_download_name(asset.download_name)
+         asset.set_version(version)
+      return asset
+
+
+   def github_latest_release(self, repo):
       req_url = f'https://api.github.com/repos/{repo}/releases/latest'
       self.print(f'Checking releases via {req_url}', v=1)
       release = self.request_json(req_url)
 
       assets = [AddonAssetInfo(release['name'], a['browser_download_url']) for a in release['assets']]
 
-      likely_assets = assets
-      likely_assets = [a for a in likely_assets if a.download_name.startswith(self.name)]
-      likely_assets = [a for a in likely_assets if a.download_name.endswith('.zip')]
-      if asset_filter:
-         likely_assets = [a for a in likely_assets if asset_filter(a)]
+      def asset_filter(asset):
+         if not asset.download_name.lower().startswith(self.name.lower()):
+            return False
+         if not asset.download_name.endswith('.zip'):
+            return False
+         for unlikely in ['-bc.zip', '-classic.zip', '-wrath.zip']:
+            if asset.download_name.endswith(unlikely):
+               return False
+         return True
+
+      likely_assets = [a for a in assets if asset_filter(a)]
       assert len(likely_assets) == 1, (self.name, [a.download_name for a in likely_assets], [a.download_name for a in assets], req_url)
       return likely_assets[0]
 
@@ -1461,7 +1475,7 @@ class Addon:
             page -= 1
             break
          raw_tags += page_tags
-      
+
       self.print(f'Sorting {len(raw_tags)} tags from {page} pages', v=1)
       assets = []
       for x in raw_tags:
@@ -1476,12 +1490,12 @@ class Addon:
       return latest_asset
 
    # -
-   
+
    def install_from_asset(self, asset, extract_to=ADDONS_DIR):
       self.print(f'(Downloading {asset.download_url})')
       with requests.get(asset.download_url) as res:
          b = res.content
-      
+
       self.print(f'(Extracting {asset.download_name}/* to {extract_to}/*)')
       with io.BytesIO(b) as f:
          with zipfile.ZipFile(f) as z:
@@ -1517,7 +1531,7 @@ def install_details_damage_meter(addon, asset):
       move(temp_addon_dir, ADDONS_DIR / addon.name)
 
    return True
-   
+
 # -
 
 ADDON_BY_NAME = {}
@@ -1559,7 +1573,7 @@ def parse_version__plater(version):
          break
    else:
       assert False, f'Parse failed: {version}'
-      
+
    version = parse_version__default(version)
    return version
 
@@ -1568,21 +1582,9 @@ ADDON_BY_NAME['plater'].fn_parse_version = parse_version__plater
 
 # -
 
-def query_latest_asset__mrt(addon):
-   def filter_retail_only(asset):
-      for unlikely in ['-bc.zip', '-classic.zip', '-wrath.zip']:
-         if asset.download_name.endswith(unlikely):
-            return False
-      return True
-   asset = addon.github_latest_release(addon.repo, asset_filter=filter_retail_only)
+ADDON_BY_NAME['mrt'].fn_asset_version_from_download_name = lambda download_name: download_name.removeprefix('MRT').removesuffix('.zip')
 
-   version = asset.download_name.removeprefix('MRT').removesuffix('.zip')
-   asset.set_version(version)
-
-   return asset
-
-
-ADDON_BY_NAME['mrt'].fn_query_latest_asset = query_latest_asset__mrt
+ADDON_BY_NAME['omnicd'].fn_asset_version_from_download_name = lambda download_name: download_name.removeprefix('omnicd-v').removesuffix('.zip')
 
 # -
 
@@ -1592,19 +1594,19 @@ def update_addon(addon, check_only, installed_only=True):
       if installed_only and existing_installed_version == None:
          addon.print('Not installed, skipping.')
          return True # Well, it's not out of date...
-      
-      asset = addon.fn_query_latest_asset(addon)
+
+      asset = addon.query_latest_asset()
       if installed_only and existing_installed_version >= asset.version:
          latest_text = 'latest'
          if existing_installed_version != asset.version:
             latest_text = f'v{asset.version} is latest'
          addon.print(f'Already at v{existing_installed_version}. ({latest_text})')
          return True
-      
+
       if check_only:
          addon.print(f'!!! UPDATE: v{existing_installed_version} installed, but v{asset.version} is available: {asset.download_url}')
          return False
-      
+
       if not addon.fn_install(addon, asset):
          return False
       post_install_version = addon.get_installed_version()
@@ -1617,7 +1619,7 @@ def update_addon(addon, check_only, installed_only=True):
    except ExButNotVerbose:
       return None
 
-# - 
+# -
 
 def update_addons(addons, **kwargs):
    updates_found = 0
@@ -1628,7 +1630,7 @@ def update_addons(addons, **kwargs):
             updates_found += 1
          if up_to_date == None:
             errors_found += 1
-   
+
    with_errors = ''
    if errors_found:
       with_errors = f' (with {errors_found} errors)'
@@ -1709,24 +1711,24 @@ if __name__ == '__main__':
          addon_names = sorted(list(ADDON_BY_NAME))
       addons = addons_by_names(addon_names)
       exit_bool(update_addons(addons, check_only=True))
-   
+
    if cmd == 'update':
       addon_names = args
       if not addon_names:
          addon_names = sorted(list(ADDON_BY_NAME))
       addons = addons_by_names(addon_names)
       exit_bool(update_addons(addons, check_only=False))
-   
+
    if cmd == 'install':
       addon_names = args
       if not addon_names:
          assert False, f'Choose one or more names of addons to install!'
       addons = addons_by_names(addon_names)
       exit_bool(update_addons(addons, check_only=False, installed_only=False))
-   
+
    if cmd != 'help':
       print(f'Unrecognized cmd `${cmd}`.')
-   
+
    print('''\
    wow-addon-update.py <cmd>
 
