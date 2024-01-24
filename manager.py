@@ -1358,7 +1358,7 @@ def request_json(url):
       text = text.replace('\r\n', '\n')
       j = json.loads(text)
       return j
-   
+
    return fetch()
    
 
@@ -1366,13 +1366,17 @@ def request_json(url):
 
 class AddonAssetInfo:
    def __init__(self, version, download_url):
-      version = lstrip_non_digits(version)
-      self.version = packaging.version.parse(version)
+      self.set_version(version)
       self.download_url = download_url
 
       parsed_url = urllib.parse.urlparse(download_url)
       url_path = parsed_url.path
       self.download_name = PurePath(url_path).name
+
+   def set_version(self, version):
+      version = lstrip_non_digits(version)
+      self.version = packaging.version.parse(version)
+
 
 def lstrip_non_digits(version):
    while version and not version[0].isdigit():
@@ -1384,12 +1388,18 @@ def parse_version__default(version):
    version = lstrip_non_digits(version)
    return packaging.version.parse(version)
 
+def filter_likely_assets__default(likely_assets):
+   likely_assets = [a for a in likely_assets if a.download_name.startswith(self.name)]
+   likely_assets = [a for a in likely_assets if a.download_name.endswith('.zip')]
+   return likely_assets
+
 class Addon:
    def __init__(self, name, fn_query_latest_asset, fn_install):
       self.name = name
       self.fn_query_latest_asset = fn_query_latest_asset
       self.fn_install = fn_install
       self.fn_parse_version = parse_version__default
+      self.fn_filter_likely_assets = filter_likely_assets__default
    
 
    def print(self, text, **kwargs):
@@ -1422,7 +1432,7 @@ class Addon:
          raise
 
 
-   def github_latest_release(self, repo):
+   def github_latest_release(self, repo, asset_filter=None):
       req_url = f'https://api.github.com/repos/{repo}/releases/latest'
       self.print(f'Checking releases via {req_url}', v=1)
       release = self.request_json(req_url)
@@ -1432,10 +1442,12 @@ class Addon:
       likely_assets = assets
       likely_assets = [a for a in likely_assets if a.download_name.startswith(self.name)]
       likely_assets = [a for a in likely_assets if a.download_name.endswith('.zip')]
-      assert len(likely_assets) == 1, (self.name, likely_assets, assets, req_url)
+      if asset_filter:
+         likely_assets = [a for a in likely_assets if asset_filter(a)]
+      assert len(likely_assets) == 1, (self.name, [a.download_name for a in likely_assets], [a.download_name for a in assets], req_url)
       return likely_assets[0]
-      
-      
+
+
    def github_latest_tag(self, repo):
       raw_tags = []
       page = 0
@@ -1522,12 +1534,20 @@ for (name, repo) in [
    ('BigWigs', 'BigWigsMods/BigWigs'),
    ('LittleWigs', 'BigWigsMods/LittleWigs'),
    ('WeakAuras', 'WeakAuras/WeakAuras2'),
+   ('AstralKeys', 'astralguild/AstralKeys'),
+   ('MRT', 'curseforge-mirror/method-raid-tools'),
    ('Plater', 'Tercioo/Plater-Nameplates'),
+   ('DBM-Core', 'DeadlyBossMods/DBM-Retail'),
+   ('DBM-Party-Dragonflight', 'DeadlyBossMods/DBM-Dungeons'),
+   ('DBM-PvP', 'DeadlyBossMods/DBM-PvP'),
+   ('OmniCC', 'tullamods/OmniCC'),
+   ('OmniCD', 'curseforge-mirror/omnicd'),
+   ('Simulationcraft', 'simulationcraft/simc-addon'),
 ]:
-   def wrap(repo):
-      return lambda addon: addon.github_latest_release(repo)
-   RegisterAddon(name, wrap(repo), Addon.install_from_asset)
+   addon = RegisterAddon(name, lambda addon: addon.github_latest_release(addon.repo), Addon.install_from_asset)
+   addon.repo = repo
 
+# -
 # Errata:
 
 def parse_version__plater(version):
@@ -1543,7 +1563,26 @@ def parse_version__plater(version):
    version = parse_version__default(version)
    return version
 
+
 ADDON_BY_NAME['plater'].fn_parse_version = parse_version__plater
+
+# -
+
+def query_latest_asset__mrt(addon):
+   def filter_retail_only(asset):
+      for unlikely in ['-bc.zip', '-classic.zip', '-wrath.zip']:
+         if asset.download_name.endswith(unlikely):
+            return False
+      return True
+   asset = addon.github_latest_release(addon.repo, asset_filter=filter_retail_only)
+
+   version = asset.download_name.removeprefix('MRT').removesuffix('.zip')
+   asset.set_version(version)
+
+   return asset
+
+
+ADDON_BY_NAME['mrt'].fn_query_latest_asset = query_latest_asset__mrt
 
 # -
 
@@ -1613,7 +1652,7 @@ def addons_by_names(names):
    ret = []
    for name in names:
       try:
-         addon = ADDON_BY_NAME[name]
+         addon = ADDON_BY_NAME[name.lower()]
       except KeyError:
          assert False, f'Unrecognized addon name: {name}'
       ret.append(addon)
@@ -1657,7 +1696,6 @@ if __name__ == '__main__':
             print(f'   {addon.name} v{v}')
          else:
             not_installed.append(addon)
-            print(f'   ({addon.name} not installed)')
       print('Available for install:')
       for addon in not_installed:
          print(f'   {addon.name}')
