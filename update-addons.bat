@@ -1,3 +1,3 @@
 @echo off
-python manager.py update
+py manager.py update
 pause
