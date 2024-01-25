@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! python3
 
 assert __name__ == '__main__'
 

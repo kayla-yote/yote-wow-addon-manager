@@ -17,24 +17,26 @@ from collections import namedtuple
 import concurrent.futures
 import io
 import json
-import packaging.version
 from pathlib import *
 import re
 import shutil
 import subprocess
 import sys
 import time
-import urllib.parse
 import zipfile
 
 # -
 # Packages from pip
 
-try:
-   import requests
-except ModuleNotFoundError:
-   subprocess.run('pip install requests', shell=True)
-   import requests
+while True:
+   try:
+      import packaging.version
+      import requests
+      import urllib.parse
+      break
+   except ModuleNotFoundError:
+      subprocess.run("py -m pip  install  packaging requests urllib3", shell=True)
+      continue
 
 # -
 
