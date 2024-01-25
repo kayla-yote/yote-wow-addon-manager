@@ -2,6 +2,13 @@
 > *A no-frills addon manager for installing and updating WoW addons.*
 
 # Install
+
+## Requirements
+
+* Python: https://www.python.org/downloads/
+
+## Instructions
+
 Extract the `yote-wow-addon-manager` folder from the zip, into your `AddOns` folder.
 
 > *Usually this is at `C:\Program Files (x86)\World of Warcraft\_retail_\Interface\AddOns\`.*
