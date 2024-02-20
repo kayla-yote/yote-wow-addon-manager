@@ -17,8 +17,14 @@ except FileNotFoundError:
     pass
 os.mkdir(SRC / OUT)
 
+COMPRESSIONS = [
+#    zipfile.ZIP_LZMA, # Not supported by Windows built-in zip extraction.
+#    zipfile.ZIP_BZIP2, # Not supported by Windows's built-in zip extraction.
+    zipfile.ZIP_DEFLATED,
+]
+
 def best_zip(*args, **kwargs):
-    for compression in [zipfile.ZIP_LZMA, zipfile.ZIP_BZIP2, zipfile.ZIP_DEFLATED]:
+    for compression in COMPRESSIONS:
         try:
             return zipfile.ZipFile(*args, compression=compression, **kwargs)
         except RuntimeError:
@@ -29,8 +35,6 @@ zip_path = OUT / f'{PRODUCT}.zip'
 rel_zip_path = zip_path.relative_to(SRC)
 print(f'> {rel_zip_path}')
 with best_zip(zip_path, mode='w') as z:
-    z.mkdir(PRODUCT)
-
     def add(path):
         src = SRC / path
         dst = f'{PRODUCT}/{path}'
