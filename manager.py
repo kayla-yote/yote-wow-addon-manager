@@ -1,5 +1,12 @@
 #! python3
 
+import sys
+
+MIN_PY_VERSION = (3,10)
+expected = '.'.join([str(i) for i in MIN_PY_VERSION])
+was = '.'.join([str(i) for i in sys.version_info])
+assert sys.version_info >= MIN_PY_VERSION, f'Python version {expected} required, but found {was}.'
+
 # -
 
 import time
@@ -34,7 +41,8 @@ while True:
       import requests
       import urllib.parse
       break
-   except ModuleNotFoundError:
+   except ModuleNotFoundError as e:
+      print2(e)
       subprocess.run("py -m pip  install  packaging requests urllib3", shell=True)
       continue
 
@@ -1484,7 +1492,8 @@ class Addon:
          try:
             a = AddonAssetInfo(x['name'], x['zipball_url'])
          except packaging.version.InvalidVersion:
-            self.print(f'(Warning: Tag not parseable as version: "{x['name']}")', v=2)
+            name = x['name'] # Python 3.10
+            self.print(f'(Warning: Tag not parseable as version: "{name}")', v=2)
             continue
          assets.append(a)
       assets = sorted(assets, key=lambda t: t.version)
