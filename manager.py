@@ -1607,6 +1607,8 @@ ADDON_BY_NAME['omnicd'].fn_asset_version_from_download_name = lambda download_na
 # Version in LittleWigs.toc is stuck on v10.2.57, causing this to always seem out-of-date.
 ADDON_BY_NAME['littlewigs'].toc_name = 'LittleWigs_Mainline.toc'
 
+ADDON_BY_NAME['mrt'].toc_name = 'MRT-Mainline.toc'
+
 # -
 
 def update_addon(addon, check_only, installed_only=True):
