@@ -1410,6 +1410,7 @@ class Addon:
       self.fn_install = fn_install
       self.fn_parse_version = parse_version__default
       self.fn_asset_version_from_download_name = None
+      self.toc_name = f'{self.name}.toc'
 
 
    def print(self, text, **kwargs):
@@ -1420,9 +1421,13 @@ class Addon:
       addon_dir = ADDONS_DIR / self.name
       if not addon_dir.exists():
          return None
-      toc = addon_dir / f'{self.name}.toc'
-      assert toc.exists(), toc
+      toc = addon_dir / self.toc_name
 
+      return self.get_toc_version(toc)
+
+
+   def get_toc_version(self, toc):
+      assert toc.exists(), toc
 
       self.print(f'Reading version from {toc}', v=1)
       kvs = kvs_from_toc_file(toc)
@@ -1596,6 +1601,11 @@ ADDON_BY_NAME['plater'].fn_parse_version = parse_version__plater
 ADDON_BY_NAME['mrt'].fn_asset_version_from_download_name = lambda download_name: download_name.removeprefix('MRT').removesuffix('.zip')
 
 ADDON_BY_NAME['omnicd'].fn_asset_version_from_download_name = lambda download_name: download_name.removeprefix('omnicd-v').removesuffix('.zip')
+
+# -
+
+# Version in LittleWigs.toc is stuck on v10.2.57, causing this to always seem out-of-date.
+ADDON_BY_NAME['littlewigs'].toc_name = 'LittleWigs_Mainline.toc'
 
 # -
 
