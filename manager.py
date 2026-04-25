@@ -1595,6 +1595,7 @@ def parse_version__plater(version):
 
 
 ADDON_BY_NAME['plater'].fn_parse_version = parse_version__plater
+ADDON_BY_NAME['simulationcraft'].fn_parse_version = parse_version__plater
 
 # -
 
