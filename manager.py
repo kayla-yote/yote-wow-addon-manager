@@ -1573,6 +1573,7 @@ for (name, repo) in [
    ('OmniCC', 'tullamods/OmniCC'),
    ('OmniCD', 'curseforge-mirror/omnicd'),
    ('Simulationcraft', 'simulationcraft/simc-addon'),
+   ('BugSack', 'funkydude/BugSack'),
 ]:
    addon = RegisterAddon(name, lambda addon: addon.github_latest_release(addon.repo), Addon.install_from_asset)
    addon.repo = repo
